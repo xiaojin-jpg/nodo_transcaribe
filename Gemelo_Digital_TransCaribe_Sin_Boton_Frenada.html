@@ -1,0 +1,569 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gemelo Digital · Nodo IoT TransCaribe</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg:#06090e; --pcb:#0b302a; --gold:#d1a82a;
+  --orange:#ff6600; --green:#34c585; --red:#ff625c;
+  --text:#e7eef8; --muted:#97a9c1;
+  --border:#223652; --panel:#0f1c2f; --card:#15263f;
+}
+* {box-sizing:border-box;margin:0;padding:0}
+body {
+  background:radial-gradient(circle at 50% 20%,#10213a,#04070c);
+  color:var(--text);font-family:Barlow,sans-serif;min-height:100vh;
+}
+header {
+  padding:12px 18px;background:#0f1c2fee;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+}
+.brand {font-weight:700;font-size:15px}
+.badge {background:var(--orange);padding:3px 7px;border-radius:4px;font-size:10px}
+.metrics {display:flex;gap:8px;align-items:center;flex-wrap:wrap;font:11px "JetBrains Mono",monospace}
+.metric {padding:6px 9px;background:#ffffff09;border:1px solid var(--border);border-radius:6px}
+.metric span {color:var(--muted)}
+button {cursor:pointer;font-family:inherit}
+.btn {background:var(--orange);color:white;border:0;padding:8px 11px;border-radius:5px;font-weight:600}
+.btn-secondary {background:var(--card);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:5px}
+.layout {display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:12px;padding:12px;align-items:start}
+.board-wrap {min-width:0;background:#04080f;border:1px solid var(--border);border-radius:12px;padding:8px;box-shadow:inset 0 0 45px #000}
+.board {width:100%;height:auto;display:block;filter:drop-shadow(0 12px 18px #0009)}
+.comp-group {cursor:pointer;transition:opacity .2s}
+.comp-group:hover {opacity:.88}
+.comp-group.selected .highlight {stroke:var(--orange);stroke-width:3}
+.wire {fill:none;stroke:var(--gold);stroke-width:2.2;opacity:.72;filter:drop-shadow(0 0 3px #d1a82a)}
+.wire.off {opacity:.16}
+.side {display:flex;flex-direction:column;gap:10px;min-width:0}
+.card {background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:13px;box-shadow:0 8px 20px #0005}
+.card-title {font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:9px}
+.comp-title {font-size:19px;font-weight:700;margin-bottom:5px}
+.desc {font-size:12px;color:var(--muted);line-height:1.45;margin-bottom:12px}
+table {width:100%;border-collapse:collapse;font:11px "JetBrains Mono",monospace;margin-bottom:12px}
+th {text-align:left;color:var(--muted);padding:5px 0;border-bottom:1px solid var(--border)}
+td {padding:6px 2px;border-bottom:1px solid #ffffff0a;overflow-wrap:anywhere}
+td:first-child {color:var(--gold);width:35%}
+.telemetry {background:#080d14;border:1px solid var(--border);border-radius:6px;padding:9px;font:11px/1.6 "JetBrains Mono",monospace;white-space:pre-wrap;color:#bfe8d2}
+.switch-row {display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #ffffff0b;font-size:12px}
+.switch {width:35px;height:19px;position:relative;flex-shrink:0}
+.switch input {opacity:0;width:0;height:0}
+.slider {position:absolute;inset:0;background:#34445b;border-radius:20px;cursor:pointer}
+.slider:before {content:"";position:absolute;width:13px;height:13px;left:3px;top:3px;background:white;border-radius:50%;transition:.2s}
+.switch input:checked + .slider {background:var(--orange)}
+.switch input:checked + .slider:before {transform:translateX(16px)}
+.scopes {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px}
+.scope {min-width:0;background:#080d14;border:1px solid var(--border);border-radius:7px;padding:8px}
+.scope small {display:flex;justify-content:space-between;gap:5px;color:var(--muted);font-size:10px;flex-wrap:wrap}
+.scope canvas {display:block;width:100%;height:80px;margin-top:5px}
+.modal {display:none;position:fixed;inset:0;background:#000c;z-index:10;align-items:center;justify-content:center;padding:15px}
+.modal.active {display:flex}
+.terminal {width:min(850px,100%);height:min(500px,85vh);background:#080d14;border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;overflow:hidden}
+.terminal-head {padding:10px;background:var(--panel);display:flex;justify-content:space-between;align-items:center}
+.console {padding:12px;overflow:auto;white-space:pre-wrap;word-break:break-word;font:11px/1.7 "JetBrains Mono",monospace;color:#bfe8d2;flex:1}
+@media(max-width:950px) {
+ .layout {grid-template-columns:1fr}
+ .side {display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .inspection {grid-row:span 2}
+}
+@media(max-width:600px) {
+ .side {display:flex}
+ .scopes {grid-template-columns:1fr}
+ .scope canvas {height:65px}
+ .brand {font-size:13px}
+}
+</style>
+</head>
+
+<body>
+<header>
+  <div class="brand">NODO ON-BOARD TRANSCARIBE <span class="badge">GEMELO DIGITAL</span></div>
+  <div class="metrics">
+    <div class="metric"><span>Estado:</span> <b id="status" style="color:var(--green)">ONLINE</b></div>
+    <div class="metric"><span>Muestras:</span> <b id="seq">#0</b></div>
+    <div class="metric"><span>Cola WAL:</span> <b id="queue">0 msj</b></div>
+    <button class="btn-secondary" onclick="toggleConsole()">Monitor Serial</button>
+  </div>
+</header>
+
+<main class="layout">
+<section class="board-wrap">
+<svg class="board" viewBox="0 0 800 480" role="img" aria-label="Placa electrónica interactiva del nodo IoT">
+<defs>
+  <linearGradient id="pcb" x2="0.9" y2="1">
+    <stop stop-color="#155448"/><stop offset="1" stop-color="#07241f"/>
+  </linearGradient>
+  <linearGradient id="blue" x2="1" y2="1">
+    <stop stop-color="#3376ce"/><stop offset="1" stop-color="#102d60"/>
+  </linearGradient>
+  <linearGradient id="metal" x2="0" y2="1">
+    <stop stop-color="#f1f4f7"/><stop offset=".5" stop-color="#9da9b5"/><stop offset="1" stop-color="#d9e0e6"/>
+  </linearGradient>
+  <linearGradient id="blackchip" x2="0" y2="1">
+    <stop stop-color="#3c4652"/><stop offset="1" stop-color="#080b10"/>
+  </linearGradient>
+  <linearGradient id="gold" x2="1" y2="1">
+    <stop stop-color="#f8e7b6"/><stop offset="1" stop-color="#b58a36"/>
+  </linearGradient>
+  <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+    <feDropShadow dx="0" dy="4" stdDeviation="4" flood-opacity=".55"/>
+  </filter>
+  <filter id="glow">
+    <feGaussianBlur stdDeviation="4"/>
+  </filter>
+  <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+    <path d="M20 0H0V20" fill="none" stroke="#7bdbb0" stroke-opacity=".07" stroke-width=".5"/>
+  </pattern>
+</defs>
+
+<!-- PCB, rejilla, tornillos y marcas -->
+<rect x="3" y="3" width="794" height="474" rx="15" fill="url(#pcb)" stroke="#28715f" stroke-width="3"/>
+<rect x="10" y="10" width="780" height="460" rx="12" fill="url(#grid)"/>
+<g fill="#071c18" stroke="#d1a82a" stroke-width="2">
+  <circle cx="20" cy="20" r="8"/><circle cx="780" cy="20" r="8"/>
+  <circle cx="20" cy="460" r="8"/><circle cx="780" cy="460" r="8"/>
+</g>
+<g fill="#d1a82a">
+  <circle cx="20" cy="20" r="3"/><circle cx="780" cy="20" r="3"/>
+  <circle cx="20" cy="460" r="3"/><circle cx="780" cy="460" r="3"/>
+</g>
+<text x="30" y="466" fill="#c1d5cf" opacity=".7" font-size="10" font-family="monospace">TC-101 · ON-BOARD · REV A</text>
+<text x="640" y="466" fill="#c1d5cf" opacity=".7" font-size="10" font-family="monospace">UNISINÚ · IOT</text>
+
+<!-- Pistas y vías de cobre -->
+<g class="wire">
+  <path id="w-gps" d="M230 85H265V190H300"/>
+  <path id="w-imu" d="M170 245H260V235H300"/>
+  <path id="w-sec" d="M580 75H535V205H490"/>
+  <path id="w-modem" d="M490 250H580"/>
+  <path id="w-power" d="M435 320V350H435V372"/>
+  <path d="M210 375H255V290H300"/>
+  <path d="M490 285H530V330H610V300"/>
+</g>
+<g fill="#e0bd55" stroke="#714d15" stroke-width="1">
+  <circle cx="265" cy="85" r="3"/><circle cx="265" cy="190" r="3"/>
+  <circle cx="260" cy="245" r="3"/><circle cx="535" cy="75" r="3"/>
+  <circle cx="535" cy="205" r="3"/><circle cx="530" cy="330" r="3"/>
+  <circle cx="255" cy="375" r="3"/><circle cx="435" cy="350" r="3"/>
+</g>
+<g fill="#071d19" stroke="#c99c35" stroke-width="1">
+  <circle cx="275" cy="135" r="5"/><circle cx="250" cy="310" r="5"/>
+  <circle cx="550" cy="130" r="5"/><circle cx="560" cy="340" r="5"/>
+</g>
+<g font-family="monospace" font-size="9" fill="#f2d98a">
+  <text x="234" y="55">UART2</text><text x="176" y="265">I2C 0x68</text>
+  <text x="500" y="182">I2C 0x60</text><text x="215" y="395">ADC GPIO34</text>
+</g>
+
+<!-- GPS NEO-M8N -->
+<g class="comp-group" id="c-gps" onclick="selectComp('gps')" filter="url(#shadow)">
+  <rect x="40" y="40" width="190" height="110" rx="7" fill="url(#blue)" stroke="#6b9de3" stroke-width="1.5"/>
+  <rect x="48" y="48" width="174" height="94" rx="4" fill="none" stroke="#a8cbf6" stroke-opacity=".45"/>
+  <!-- Antena cerámica con patrón -->
+  <rect x="52" y="52" width="64" height="64" rx="4" fill="url(#gold)" stroke="#f8e7b6" stroke-width="1.5"/>
+  <path d="M59 58H108V68H66V78H108V88H66V98H108V109" fill="none" stroke="#8b682d" stroke-width="2.4"/>
+  <path d="M59 62H105 M59 82H105 M59 102H105" stroke="#fff0c8" stroke-width="1" fill="none"/>
+  <!-- componentes SMD -->
+  <g fill="#e2e6ea" stroke="#68727e" stroke-width=".7">
+    <rect x="124" y="48" width="10" height="5" rx="1"/><rect x="139" y="48" width="10" height="5" rx="1"/>
+    <rect x="154" y="48" width="10" height="5" rx="1"/><rect x="169" y="48" width="10" height="5" rx="1"/>
+  </g>
+  <rect x="132" y="96" width="26" height="26" rx="2" fill="url(#blackchip)" stroke="#aeb8c4"/>
+  <circle cx="145" cy="109" r="6" fill="#202b37" stroke="#8a9aa9"/>
+  <text x="124" y="72" font-size="16" font-weight="700" fill="#fff">GNSS</text>
+  <text x="124" y="87" font-size="10" fill="#e0edff">NEO-M8N</text>
+  <text x="52" y="133" font-size="9" fill="#fff">ANT · NMEA 1 Hz</text>
+  <circle id="led-gps" cx="212" cy="58" r="5" fill="#34c585"/>
+  <rect class="highlight" x="40" y="40" width="190" height="110" rx="7" fill="none" stroke="transparent"/>
+</g>
+
+<!-- IMU -->
+<g class="comp-group" id="c-imu" onclick="selectComp('imu')" filter="url(#shadow)">
+  <rect x="40" y="205" width="130" height="80" rx="7" fill="url(#blue)" stroke="#6b9de3" stroke-width="1.5"/>
+  <!-- Header de pines -->
+  <g fill="#e5c46c" stroke="#9b7527" stroke-width=".6">
+    <rect x="47" y="210" width="5" height="8"/><rect x="57" y="210" width="5" height="8"/>
+    <rect x="67" y="210" width="5" height="8"/><rect x="77" y="210" width="5" height="8"/>
+    <rect x="87" y="210" width="5" height="8"/><rect x="97" y="210" width="5" height="8"/>
+    <rect x="107" y="210" width="5" height="8"/><rect x="117" y="210" width="5" height="8"/>
+  </g>
+  <rect x="56" y="225" width="34" height="34" rx="2" fill="url(#blackchip)" stroke="#b5c1ce"/>
+  <circle cx="61" cy="230" r="2" fill="#e1e6eb"/>
+  <g fill="#d8dde2">
+    <rect x="95" y="222" width="8" height="4"/><rect x="106" y="222" width="8" height="4"/>
+    <rect x="117" y="222" width="8" height="4"/>
+  </g>
+  <text x="100" y="241" font-size="16" font-weight="700" fill="#fff">IMU</text>
+  <text x="100" y="256" font-size="9" fill="#e2edff">MPU6050</text>
+  <text x="56" y="276" font-size="9" fill="#fff">±2 g · 20 Hz</text>
+  <rect class="highlight" x="40" y="205" width="130" height="80" rx="7" fill="none" stroke="transparent"/>
+</g>
+
+<!-- Sensor óptico de pasajeros -->
+<g class="comp-group" id="c-door" onclick="selectComp('door')" filter="url(#shadow)">
+  <rect x="40" y="330" width="170" height="90" rx="7" fill="url(#blackchip)" stroke="#aab4bf" stroke-width="2"/>
+  <rect x="48" y="338" width="154" height="74" rx="4" fill="none" stroke="#8e9eae" stroke-opacity=".5"/>
+  <g>
+    <circle cx="76" cy="383" r="19" fill="#151c25" stroke="#a9b7c6" stroke-width="2"/>
+    <circle cx="76" cy="383" r="13" fill="#07101b" stroke="#415367"/>
+    <circle cx="72" cy="379" r="4" fill="#617b94"/>
+    <circle cx="126" cy="383" r="19" fill="#151c25" stroke="#a9b7c6" stroke-width="2"/>
+    <circle cx="126" cy="383" r="13" fill="#07101b" stroke="#415367"/>
+    <circle cx="122" cy="379" r="4" fill="#617b94"/>
+  </g>
+  <text x="56" y="354" font-size="16" font-weight="700" fill="#fff">Pasajeros</text>
+  <text x="150" y="388" font-size="10" fill="#dbe8e2">ToF</text>
+  <g fill="#d7b458">
+    <rect x="55" y="403" width="7" height="4"/><rect x="66" y="403" width="7" height="4"/>
+    <rect x="77" y="403" width="7" height="4"/><rect x="88" y="403" width="7" height="4"/>
+  </g>
+  <rect class="highlight" x="40" y="330" width="170" height="90" rx="7" fill="none" stroke="transparent"/>
+</g>
+
+<!-- ESP32 principal -->
+<g class="comp-group selected" id="c-esp" onclick="selectComp('esp')" filter="url(#shadow)">
+  <rect x="300" y="150" width="190" height="170" rx="6" fill="#c4cbd2" stroke="#f3f6f9" stroke-width="2"/>
+  <!-- Pines laterales -->
+  <g fill="#e8bd53" stroke="#8b6622" stroke-width=".7">
+    <rect x="291" y="163" width="10" height="6"/><rect x="291" y="175" width="10" height="6"/>
+    <rect x="291" y="187" width="10" height="6"/><rect x="291" y="199" width="10" height="6"/>
+    <rect x="291" y="211" width="10" height="6"/><rect x="291" y="223" width="10" height="6"/>
+    <rect x="291" y="235" width="10" height="6"/><rect x="291" y="247" width="10" height="6"/>
+    <rect x="291" y="259" width="10" height="6"/><rect x="291" y="271" width="10" height="6"/>
+    <rect x="291" y="283" width="10" height="6"/><rect x="291" y="295" width="10" height="6"/>
+    <rect x="490" y="163" width="10" height="6"/><rect x="490" y="175" width="10" height="6"/>
+    <rect x="490" y="187" width="10" height="6"/><rect x="490" y="199" width="10" height="6"/>
+    <rect x="490" y="211" width="10" height="6"/><rect x="490" y="223" width="10" height="6"/>
+    <rect x="490" y="235" width="10" height="6"/><rect x="490" y="247" width="10" height="6"/>
+    <rect x="490" y="259" width="10" height="6"/><rect x="490" y="271" width="10" height="6"/>
+    <rect x="490" y="283" width="10" height="6"/><rect x="490" y="295" width="10" height="6"/>
+  </g>
+  <!-- Blindaje RF -->
+  <rect x="308" y="158" width="174" height="39" rx="4" fill="url(#metal)" stroke="#747f8c" stroke-width="1.5"/>
+  <path d="M316 166H474 M316 173H474 M316 180H474 M316 187H474" stroke="#ffffff" stroke-opacity=".25"/>
+  <text x="318" y="181" font-size="14" font-weight="700" fill="#293440">ESP32-WROOM</text>
+  <!-- Antena impresa -->
+  <path d="M318 205H354V211H323V217H354V223H323V229H354" fill="none" stroke="#9c7a35" stroke-width="2.2"/>
+  <text x="365" y="213" font-size="9" fill="#273544">Wi-Fi / BLE</text>
+  <text x="318" y="245" font-size="10" fill="#2b3a49">32E · 240 MHz · 4 MB</text>
+  <text id="espLive" x="318" y="265" font-size="10" fill="#16202b">cola 0 · seq 0</text>
+  <!-- SMD components -->
+  <g fill="#222a32" stroke="#7c8792" stroke-width=".7">
+    <rect x="318" y="278" width="15" height="8" rx="1"/><rect x="339" y="278" width="15" height="8" rx="1"/>
+    <rect x="360" y="278" width="15" height="8" rx="1"/><rect x="381" y="278" width="15" height="8" rx="1"/>
+  </g>
+  <g fill="#d5b456">
+    <rect x="318" y="291" width="10" height="4"/><rect x="332" y="291" width="10" height="4"/>
+    <rect x="346" y="291" width="10" height="4"/>
+  </g>
+  <circle cx="430" cy="300" r="11" fill="#2ee07a" opacity=".2" filter="url(#glow)"/>
+  <circle cx="452" cy="300" r="11" fill="#ffd04a" opacity=".2" filter="url(#glow)"/>
+  <circle cx="474" cy="300" r="11" fill="#ff4a45" opacity=".2" filter="url(#glow)"/>
+  <circle id="led-ok" cx="430" cy="300" r="5" fill="#2ee07a"/>
+  <circle id="led-fwd" cx="452" cy="300" r="5" fill="#222"/>
+  <circle id="led-off" cx="474" cy="300" r="5" fill="#222"/>
+  <rect class="highlight" x="300" y="150" width="190" height="170" rx="6" fill="none" stroke="var(--orange)" stroke-width="3"/>
+</g>
+
+<!-- Módem SIM7600 -->
+<g class="comp-group" id="c-modem" onclick="selectComp('modem')" filter="url(#shadow)">
+  <rect x="580" y="150" width="190" height="150" rx="7" fill="#242d37" stroke="#b3bdc7" stroke-width="2"/>
+  <rect x="590" y="160" width="170" height="130" rx="4" fill="none" stroke="#8795a4" stroke-opacity=".5"/>
+  <rect x="594" y="168" width="100" height="44" rx="4" fill="url(#metal)" stroke="#77838f"/>
+  <path d="M601 175H686 M601 180H686 M601 185H686" stroke="#fff" stroke-opacity=".35"/>
+  <text x="602" y="198" font-size="14" font-weight="700" fill="#16202b">SIM7600</text>
+  <text x="602" y="208" font-size="8" fill="#2b3a49">LTE MODEM</text>
+  <!-- Conectores RF -->
+  <circle cx="722" cy="179" r="10" fill="#b9c2cb" stroke="#edf1f4" stroke-width="1.5"/>
+  <circle cx="722" cy="179" r="5" fill="#303b47"/>
+  <circle cx="722" cy="179" r="2" fill="#d4ad4d"/>
+  <circle cx="722" cy="205" r="7" fill="#b9c2cb" stroke="#edf1f4"/>
+  <circle cx="722" cy="205" r="3" fill="#303b47"/>
+  <text x="598" y="236" font-size="11" fill="#dbe8e2">4G LTE</text>
+  <g id="bars" fill="#2ee07a">
+    <rect x="598" y="262" width="9" height="10" rx="1"/>
+    <rect x="613" y="254" width="9" height="18" rx="1"/>
+    <rect x="628" y="246" width="9" height="26" rx="1"/>
+    <rect x="643" y="238" width="9" height="34" rx="1"/>
+  </g>
+  <text id="rssiTxt" x="660" y="270" font-size="10" fill="#dbe8e2">-67 dBm</text>
+  <rect class="highlight" x="580" y="150" width="190" height="150" rx="7" fill="none" stroke="transparent"/>
+</g>
+
+<!-- Elemento seguro -->
+<g class="comp-group" id="c-se" onclick="selectComp('se')" filter="url(#shadow)">
+  <rect x="580" y="40" width="150" height="70" rx="7" fill="#18222e" stroke="#b5c0cb" stroke-width="2"/>
+  <!-- Chip y pines -->
+  <rect x="610" y="49" width="86" height="50" rx="3" fill="url(#blackchip)" stroke="#707d8a"/>
+  <circle cx="617" cy="56" r="3" fill="#d8e0e6"/>
+  <g fill="#d7b458">
+    <rect x="613" y="44" width="7" height="6"/><rect x="628" y="44" width="7" height="6"/>
+    <rect x="643" y="44" width="7" height="6"/><rect x="658" y="44" width="7" height="6"/>
+    <rect x="673" y="44" width="7" height="6"/>
+    <rect x="613" y="98" width="7" height="6"/><rect x="628" y="98" width="7" height="6"/>
+    <rect x="643" y="98" width="7" height="6"/><rect x="658" y="98" width="7" height="6"/>
+    <rect x="673" y="98" width="7" height="6"/>
+  </g>
+  <text x="620" y="70" font-size="12" font-weight="700" fill="#fff">ATECC608</text>
+  <text x="620" y="84" font-size="8" fill="#b9c8d8">SECURE ELEMENT</text>
+  <rect class="highlight" x="580" y="40" width="150" height="70" rx="7" fill="none" stroke="transparent"/>
+</g>
+
+<!-- Alimentación -->
+<g class="comp-group" id="c-pwr" onclick="selectComp('pwr')" filter="url(#shadow)">
+  <rect x="300" y="372" width="270" height="86" rx="7" fill="#1a2531" stroke="#aab4bf" stroke-width="2"/>
+  <text x="314" y="392" font-size="12" font-weight="700" fill="#fff">POWER MANAGEMENT</text>
+  <!-- Bobina -->
+  <rect x="316" y="402" width="35" height="30" rx="3" fill="#111820" stroke="#8995a2"/>
+  <path d="M321 407Q327 402 333 407T345 407 M321 414Q327 409 333 414T345 414 M321 421Q327 416 333 421T345 421" fill="none" stroke="#d2a64d" stroke-width="2"/>
+  <!-- Condensadores -->
+  <g fill="url(#metal)" stroke="#687582">
+    <rect x="360" y="405" width="11" height="24" rx="2"/><rect x="377" y="405" width="11" height="24" rx="2"/>
+  </g>
+  <g fill="#d1a82a"><rect x="361" y="405" width="9" height="3"/><rect x="378" y="405" width="9" height="3"/></g>
+  <!-- Regulador -->
+  <rect x="400" y="403" width="45" height="29" rx="3" fill="#090e14" stroke="#6b7887"/>
+  <path d="M406 408H439 M406 414H439 M406 420H439" stroke="#4a5968"/>
+  <text x="405" y="447" font-size="8" fill="#dbe8e2">24V → 5V / 3.3V</text>
+  <!-- Batería -->
+  <rect x="478" y="388" width="78" height="56" rx="6" fill="#22579e" stroke="#72a2ed" stroke-width="1.5"/>
+  <rect x="486" y="394" width="62" height="44" rx="3" fill="none" stroke="#94b9ef" stroke-opacity=".6"/>
+  <rect x="506" y="384" width="18" height="4" rx="1" fill="#d1a82a"/>
+  <text x="490" y="412" font-size="13" font-weight="700" fill="#fff">LiPo</text>
+  <text x="490" y="430" font-size="10" fill="#e3efff">3.7 V</text>
+  <rect class="highlight" x="300" y="372" width="270" height="86" rx="7" fill="none" stroke="transparent"/>
+</g>
+
+<!-- Pulsos de transmisión -->
+<g id="pulses"></g>
+</svg>
+
+<div class="scopes">
+  <div class="scope"><small><span>Aceleración IMU</span><b id="sc1v">0.00 m/s²</b></small><canvas id="sc1"></canvas></div>
+  <div class="scope"><small><span>Error GPS</span><b id="sc2v">GPS OK</b></small><canvas id="sc2"></canvas></div>
+  <div class="scope"><small><span>Señal 4G</span><b id="sc3v">-67 dBm</b></small><canvas id="sc3"></canvas></div>
+</div>
+</section>
+
+<aside class="side">
+  <section class="card inspection">
+    <div class="card-title">Inspección de componente</div>
+    <div id="chip-title" class="comp-title">ESP32-WROOM-32E</div>
+    <div id="chip-desc" class="desc">Microcontrolador principal del nodo IoT.</div>
+    <table>
+      <thead><tr><th>Pin / Bus</th><th>Función</th></tr></thead>
+      <tbody id="pin-rows"></tbody>
+    </table>
+    <div class="card-title">Telemetría interna</div>
+    <div id="telemetry" class="telemetry">Iniciando simulación...</div>
+  </section>
+
+  <section class="card">
+    <div class="card-title">Modo avería · Inyección de fallos</div>
+    <div class="switch-row"><span>Cortar red 4G (Store & Forward)</span><label class="switch"><input id="f-net" type="checkbox" onchange="updateFaults()"><span class="slider"></span></label></div>
+    <div class="switch-row"><span>Zona sombra GPS</span><label class="switch"><input id="f-gps" type="checkbox" onchange="updateFaults()"><span class="slider"></span></label></div>
+    <div class="switch-row"><span>Certificado mTLS vencido</span><label class="switch"><input id="f-cert" type="checkbox" onchange="updateFaults()"><span class="slider"></span></label></div>
+  </section>
+</aside>
+</main>
+
+<div class="modal" id="modalTerm">
+  <div class="terminal">
+    <div class="terminal-head"><b>Monitor Serial UART · Simulación</b><button class="btn-secondary" onclick="toggleConsole()">Cerrar</button></div>
+    <div class="console" id="console"></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let SEL = "esp";
+const S = {
+  t:0, seq:0, pend:[], sent:0, acc:0,
+  netDown:false, gpsLost:false, certErr:false, brake:0,
+  rssi:-67, gpsError:1.2, passengers:45
+};
+
+const COMPS = {
+  esp:{
+    n:"ESP32-WROOM-32E",
+    d:"Microcontrolador principal. Lee los sensores, numera las muestras, gestiona la cola local y coordina la comunicación MQTT con TLS.",
+    pins:[["UART2","GPS NEO-M8N · 9600 bps"],["I2C","IMU MPU6050 + ATECC608"],["UART1","Módem LTE SIM7600"],["GPIO","Control de estados"]],
+    live:()=>`Estado: ${S.netDown?"OFFLINE · Store & Forward":S.certErr?"TLS · ERROR":"ONLINE"}\nMuestras: #${S.seq}\nCola WAL: ${S.pend.length} mensajes\nPublicadas: ${S.sent}`
+  },
+  gps:{
+    n:"GNSS NEO-M8N",
+    d:"Receptor de posicionamiento por satélite. Entrega coordenadas y tiempo mediante tramas NMEA.",
+    pins:[["Interfaz","UART 9600 baudios"],["Trama","NMEA / RMC"],["Frecuencia","1 Hz"]],
+    live:()=>`Satélites: ${S.gpsLost?0:10}\nError estimado: ${S.gpsError.toFixed(1)} m\nFix: ${S.gpsLost?"SOMBRA · ESTIMACIÓN":"3D OK"}`
+  },
+  imu:{
+    n:"IMU MPU6050",
+    d:"Acelerómetro y giroscopio de seis ejes para detectar cambios de movimiento y apoyar el análisis de frenadas.",
+    pins:[["Interfaz","I2C · 0x68"],["Muestreo","20 Hz"],["Rango","±2 g"]],
+    live:()=>`Aceleración: ${S.acc.toFixed(2)} m/s²\nFrenada: ${S.acc>3.5?"DETECTADA":"Normal"}`
+  },
+  door:{
+    n:"Sensor de pasajeros ToF",
+    d:"Sensor óptico para estimar el flujo de pasajeros en las puertas, sin necesidad de capturar imágenes.",
+    pins:[["Interfaz","ADC · GPIO34"],["Función","Estimación de flujo"]],
+    live:()=>`Pasajeros estimados: ${S.passengers}\nCapacidad referencial: 160\nOcupación: ${Math.round(S.passengers/160*100)}%`
+  },
+  se:{
+    n:"ATECC608 · Elemento seguro",
+    d:"Componente criptográfico dedicado para proteger operaciones con claves y apoyar la autenticación del nodo.",
+    pins:[["Interfaz","I2C · 0x60"],["Criptografía","ECDSA P-256"]],
+    live:()=>`Elemento seguro: DISPONIBLE\nFirmas simuladas: #${S.seq}\nmTLS: ${S.certErr?"CERTIFICADO INVÁLIDO":"CONFIGURACIÓN OK"}`
+  },
+  modem:{
+    n:"SIM7600 LTE",
+    d:"Módem celular para transmitir telemetría hacia la plataforma remota mediante conectividad móvil.",
+    pins:[["Interfaz","UART1 · 115200 bps"],["Red","4G LTE"],["Transporte","MQTT/TLS simulado"]],
+    live:()=>`Señal: ${S.netDown?"SIN RED":S.rssi+" dBm"}\nCanal: ${S.netDown?"CERRADO":S.certErr?"TLS RECHAZADO":"DISPONIBLE"}`
+  },
+  pwr:{
+    n:"Sistema de alimentación",
+    d:"Bloque de potencia representativo para adaptar la alimentación del vehículo a los voltajes requeridos por los módulos electrónicos.",
+    pins:[["Entrada","24 V DC · vehículo"],["Salidas","5 V / 3.3 V"],["Respaldo","Batería LiPo"]],
+    live:()=>`Entrada simulada: 24.1 V\nSalida lógica: 3.3 V\nBatería: 96% · OK`
+  }
+};
+
+function selectComp(key){
+  SEL=key;
+  document.querySelectorAll(".comp-group").forEach(el=>el.classList.remove("selected"));
+  $("c-"+key).classList.add("selected");
+  $("chip-title").textContent=COMPS[key].n;
+  $("chip-desc").textContent=COMPS[key].d;
+  $("pin-rows").innerHTML=COMPS[key].pins.map(p=>`<tr><td>${p[0]}</td><td>${p[1]}</td></tr>`).join("");
+  updateUI();
+}
+
+function updateFaults(){
+  S.netDown=$("f-net").checked;
+  S.gpsLost=$("f-gps").checked;
+  S.certErr=$("f-cert").checked;
+  updateUI();
+}
+
+function triggerBrake(){S.brake=3;}
+function toggleConsole(){$("modalTerm").classList.toggle("active");}
+
+function updateUI(){
+  $("chip-title").textContent=COMPS[SEL].n;
+  $("telemetry").textContent=COMPS[SEL].live();
+  $("seq").textContent="#"+S.seq;
+  $("queue").textContent=S.pend.length+" msj";
+  $("espLive").textContent=`cola ${S.pend.length} · seq #${S.seq}`;
+
+  const status=$("status");
+  status.textContent=S.netDown?"OFFLINE":S.certErr?"TLS ERROR":"ONLINE (mTLS)";
+  status.style.color=(S.netDown||S.certErr)?"var(--red)":"var(--green)";
+
+  $("led-ok").setAttribute("fill",(!S.netDown&&!S.certErr)?"#2ee07a":"#222");
+  $("led-fwd").setAttribute("fill",S.netDown?"#ffd04a":"#222");
+  $("led-off").setAttribute("fill",S.certErr?"#ff4a45":"#222");
+  $("led-gps").setAttribute("fill",S.gpsLost?"#ff625c":"#34c585");
+
+  document.querySelectorAll(".wire").forEach(w=>w.classList.remove("off"));
+  if(S.netDown||S.certErr)$("w-modem").classList.add("off");
+  if(S.gpsLost)$("w-gps").classList.add("off");
+
+  $("rssiTxt").textContent=S.netDown?"Sin señal":S.rssi+" dBm";
+  const bars=$("bars").children;
+  const level=S.netDown?0:S.rssi>-75?4:S.rssi>-90?3:S.rssi>-105?2:1;
+  for(let i=0;i<bars.length;i++)bars[i].setAttribute("fill",i<level?"#2ee07a":"#394452");
+}
+
+const history={sc1:[],sc2:[],sc3:[]};
+function pushData(id,value){
+  history[id].push(value);
+  if(history[id].length>65)history[id].shift();
+}
+function drawScope(id,color,min,max){
+  const canvas=$(id),ctx=canvas.getContext("2d");
+  const dpr=window.devicePixelRatio||1;
+  const w=canvas.clientWidth||260,h=canvas.clientHeight||80;
+  canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+  ctx.strokeStyle="#243347";ctx.lineWidth=1;
+  for(let i=1;i<4;i++){
+    ctx.beginPath();ctx.moveTo(0,h*i/4);ctx.lineTo(w,h*i/4);ctx.stroke();
+  }
+  const data=history[id];
+  if(data.length<2)return;
+  ctx.strokeStyle=color;ctx.lineWidth=1.8;ctx.beginPath();
+  data.forEach((v,i)=>{
+    const x=i*w/(data.length-1);
+    const y=h-5-((Math.max(min,Math.min(max,v))-min)/(max-min))*(h-10);
+    if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+}
+function renderScopes(){
+  drawScope("sc1","#34c585",0,6);
+  drawScope("sc2","#ffd04a",0,30);
+  drawScope("sc3","#55a7ff",-115,-50);
+}
+
+function spawnPulse(pathId){
+  const path=$(pathId);if(!path)return;
+  const len=path.getTotalLength();
+  const dot=document.createElementNS("http://www.w3.org/2000/svg","circle");
+  dot.setAttribute("r","4");dot.setAttribute("fill","#ffe27a");
+  dot.setAttribute("filter","url(#glow)");
+  $("pulses").appendChild(dot);
+  pulses.push({path,len,pos:0,dot});
+}
+const pulses=[];
+function animatePulses(){
+  for(let i=pulses.length-1;i>=0;i--){
+    const p=pulses[i];p.pos+=3;
+    if(p.pos>=p.len){p.dot.remove();pulses.splice(i,1);continue;}
+    const point=p.path.getPointAtLength(p.pos);
+    p.dot.setAttribute("cx",point.x);p.dot.setAttribute("cy",point.y);
+  }
+  requestAnimationFrame(animatePulses);
+}
+
+function sample(){
+  S.t++;S.seq++;
+  let ax=Math.abs((Math.random()-.5)*1.2);
+  if(S.brake>0){ax=4.5+Math.random();S.brake--;}
+  S.acc=ax;
+  S.rssi=Math.round(-67-Math.random()*18);
+  S.gpsError=S.gpsLost?8+Math.random()*18:.7+Math.random()*1.4;
+  S.passengers=Math.max(0,Math.min(160,S.passengers+Math.round(Math.random()*4-2)));
+
+  if(S.netDown||S.certErr)S.pend.push(S.seq);
+  else if(S.pend.length){S.pend.shift();S.sent++;spawnPulse("w-modem");}
+  else {S.sent++;spawnPulse("w-modem");}
+
+  spawnPulse("w-gps");spawnPulse("w-imu");
+  pushData("sc1",S.acc);
+  pushData("sc2",S.gpsError);
+  pushData("sc3",S.netDown?-115:S.rssi);
+
+  $("sc1v").textContent=S.acc.toFixed(2)+" m/s²";
+  $("sc2v").textContent=S.gpsLost?S.gpsError.toFixed(1)+" m · DR":"GPS OK";
+  $("sc3v").textContent=S.netDown?"Sin red":S.rssi+" dBm";
+
+  const line=`[${new Date().toLocaleTimeString()}] [MUESTRA] seq=#${S.seq} ax=${S.acc.toFixed(2)} ${S.netDown?"(Guardado en cola local)":S.certErr?"(Error de certificado simulado)":"(Envío simulado)"}\n`;
+  $("console").textContent+=line;
+  if($("console").textContent.length>18000)$("console").textContent=$("console").textContent.slice(-12000);
+  $("console").scrollTop=$("console").scrollHeight;
+
+  updateUI();renderScopes();
+}
+window.addEventListener("resize",renderScopes);
+selectComp("esp");
+renderScopes();
+animatePulses();
+setInterval(sample,1200);
+</script>
+</body>
+</html>
